@@ -48,6 +48,9 @@ podSecurityContext: {}
 # -- Container security context
 securityContext: {}
 
+# -- Pod termination grace period. Covers the 5s preStop sleep plus the in-flight request drain (up to 30s) that S3Proxy releases after 3.3.0 perform on SIGTERM.
+terminationGracePeriodSeconds: 40
+
 service:
   # -- Kubernetes service type
   type: ClusterIP

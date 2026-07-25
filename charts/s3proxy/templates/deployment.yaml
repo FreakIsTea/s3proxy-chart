@@ -30,6 +30,7 @@ spec:
         {{- toYaml . | nindent 8 }}
 {{- end }}
       serviceAccountName: {{ include "comet-common.names.serviceAccount" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
@@ -160,24 +161,44 @@ spec:
             - name: {{ include "s3proxy.portName" . }}
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
-          # tcpSocket probes only check the TCP accept, so they work unchanged
-          # against a TLS-only port (no handshake performed).
+          # /healthz responds without authentication (S3Proxy >= 3.2.0),
+          # distinguishing a serving proxy from one that merely accepts TCP.
+          # The kubelet does not verify certificates for HTTPS probes, so a
+          # self-signed keystore works when native TLS is enabled.  S3Proxy
+          # releases after 3.3.0 fail readiness while draining in-flight
+          # requests on shutdown, removing terminating pods from Service
+          # endpoints.
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: {{ include "s3proxy.portName" . }}
+{{- if .Values.config.tls.enabled }}
+              scheme: HTTPS
+{{- end }}
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 3
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: {{ include "s3proxy.portName" . }}
+{{- if .Values.config.tls.enabled }}
+              scheme: HTTPS
+{{- end }}
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 3
             successThreshold: 1
             failureThreshold: 3
+          lifecycle:
+            # Endpoint removal propagates asynchronously; keep serving
+            # briefly so late-routed connections do not land on a pod that
+            # has already begun shutting down.
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
