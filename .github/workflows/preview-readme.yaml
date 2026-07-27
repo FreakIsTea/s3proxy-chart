@@ -10,6 +10,14 @@ on:
 
 jobs:
   preview-readme:
+    # This job checks out the head branch by name and posts the rendered README
+    # diff back as a PR comment. Both of those require the head branch to live in
+    # this repo and a write-scoped GITHUB_TOKEN. Neither holds for fork PRs: the
+    # branch exists only in the fork (so `actions/checkout` with a bare `ref:`
+    # fetches refs/heads/<branch> from this repo and fails), and the
+    # pull_request event grants forks a read-only token (so createComment 403s).
+    # Skip forks; internal branches still get the preview.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
