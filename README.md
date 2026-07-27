@@ -1,6 +1,6 @@
 # s3proxy
 
-![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.3.0](https://img.shields.io/badge/AppVersion-3.3.0-informational?style=flat-square)
+![Version: 0.4.0](https://img.shields.io/badge/Version-0.4.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.3.0](https://img.shields.io/badge/AppVersion-3.3.0-informational?style=flat-square)
 
 A Helm chart for deploying S3Proxy - Access other storage backends via the S3 API
 
@@ -852,6 +852,12 @@ The following section lists the configurable parameters of the s3proxy chart and
 			<td>The name of the service account to use. If not set and create is true, a name is generated using the fullname template</td>
 			<td><code>string</code></td>
 			<td><code>""</code></td>
+		</tr>
+		<tr>
+			<td><code>terminationGracePeriodSeconds</code></td>
+			<td>Pod termination grace period. Covers the 5s preStop sleep plus the in-flight request drain (up to 30s) that S3Proxy releases after 3.3.0 perform on SIGTERM.</td>
+			<td><code>int</code></td>
+			<td><code>40</code></td>
 		</tr>
 		<tr>
 			<td><code>tolerations</code></td>
