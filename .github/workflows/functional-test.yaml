@@ -12,6 +12,8 @@ name: Functional Test (kind)
 #                              backends, so s3proxy starts and serves.
 #   azureblob               -> Azurite mock, full round-trip through the fixed
 #                              jclouds.endpoint (provider-agnostic).
+#   azureblob-existing-secret -> Azurite mock, account key delivered via a
+#                              pre-created Secret (key.existingSecret path, GH #34).
 #   multi-backend           -> s3 (MinIO) + azureblob (Azurite) + filesystem (PVC)
 #                              in ONE release, with per-backend bucket-locator
 #                              routing. assert-routing.sh writes one bucket per
@@ -59,6 +61,10 @@ jobs:
           - backend: azureblob
             values: ci/functional/values/azureblob.yaml
             mock: ci/functional/mocks/azurite.yaml
+          - backend: azureblob-existing-secret
+            values: ci/functional/values/azureblob-existing-secret.yaml
+            mock: ci/functional/mocks/azurite.yaml
+            azureKeySecret: true
           - backend: multi-backend
             values: ci/functional/values/multi-backend.yaml
             mock: ci/functional/mocks/minio.yaml ci/functional/mocks/azurite.yaml
@@ -104,6 +110,14 @@ jobs:
           kubectl -n "${NAMESPACE}" create secret generic s3proxy-tls \
             --from-file=keystore.p12=/tmp/keystore.p12 \
             --from-literal=keystore-password=changeit
+
+      - name: Create Azure Blob key Secret (existingSecret leg)
+        if: matrix.azureKeySecret
+        # Azurite's devstoreaccount1 key in the Secret the chart references via
+        # azureblob.key.existingSecret (GH #34).
+        run: |
+          kubectl -n "${NAMESPACE}" create secret generic s3proxy-azureblob-key \
+            --from-literal=accountKey='Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=='
 
       - name: Deploy mock backends (${{ matrix.backend }})
         if: matrix.mock

@@ -177,13 +177,11 @@ data:
   {{- if .Values.config.backends.azureblob.account }}
     jclouds.identity={{ .Values.config.backends.azureblob.account }}
   {{- end }}
-  {{- /* When a storage account key is set, jclouds.credential is merged in from the
-         Secret. Otherwise the azureblob-sdk provider authenticates with the SAS token
-         (jclouds.azureblob.sas, merged from the Secret) or the ambient Azure Workload
-         Identity credentials injected into the pod. S3Proxy still requires
-         jclouds.credential in every backend properties file (only filesystem-nio2,
-         transient-nio2 and google-cloud-storage-sdk are exempt), so emit it empty. */}}
-  {{- if not .Values.config.backends.azureblob.key.value }}
+  {{- /* With a key (key.value or key.existingSecret) the initContainer merges
+         jclouds.credential in from a Secret. S3Proxy requires the property in every
+         backend file, so emit it empty when neither is set (SAS-token or Azure
+         Workload Identity auth). */}}
+  {{- if and (not .Values.config.backends.azureblob.key.value) (not .Values.config.backends.azureblob.key.existingSecret) }}
     jclouds.credential=
   {{- end }}
   {{- range $index, $bucket := .Values.config.backends.azureblob.bucketLocators }}

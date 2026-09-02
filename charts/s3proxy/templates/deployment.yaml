@@ -83,6 +83,19 @@ spec:
                     cat "$backend_secret" >> "$output_file"
                   fi
 
+                  # Backend credentials from an existingSecret: each file under
+                  # /backend-secret/<backend>/ is named for the jclouds property it holds.
+                  backend_secret_dir="/backend-secret/${backend}"
+                  if [ -d "$backend_secret_dir" ]
+                  then
+                    for prop_file in "$backend_secret_dir"/*
+                    do
+                      [ -f "$prop_file" ] || continue
+                      echo "" >> "$output_file"  # Add newline separator
+                      printf '%s=%s\n' "$(basename "$prop_file")" "$(cat "$prop_file")" >> "$output_file"
+                    done
+                  fi
+
                   # TLS keystore password from an existing Secret (kept out of the
                   # ConfigMap). Mounted only when config.tls.keystorePassword.existingSecret
                   # is set; an inline password arrives via secret-common.properties instead.
@@ -107,6 +120,12 @@ spec:
 {{- if and .Values.config.tls.enabled .Values.config.tls.keystorePassword.existingSecret }}
             - name: tls-keystore-password
               mountPath: /tls-password
+              readOnly: true
+{{- end }}
+{{- range $s := (include "s3proxy.externalBackendSecrets" . | fromJsonArray) }}
+            - name: {{ $s.name }}
+              mountPath: /backend-secret/{{ $s.backend }}/{{ $s.prop }}
+              subPath: {{ $s.prop }}
               readOnly: true
 {{- end }}
       containers:
@@ -271,6 +290,14 @@ spec:
             items:
               - key: {{ .Values.config.backends.googleCloudStorage.privateKey.secretKey }}
                 path: gcs-private.key
+{{- end }}
+{{- range $s := (include "s3proxy.externalBackendSecrets" . | fromJsonArray) }}
+        - name: {{ $s.name }}
+          secret:
+            secretName: {{ $s.secret }}
+            items:
+              - key: {{ $s.key }}
+                path: {{ $s.prop }}
 {{- end }}
 {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
