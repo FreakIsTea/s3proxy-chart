@@ -27,3 +27,32 @@ secure-endpoint), otherwise "http". Shared by service.yaml and deployment.yaml
 {{- define "s3proxy.portName" -}}
   {{- ternary "https" "http" .Values.config.tls.enabled -}}
 {{- end }}
+
+{{- /*
+Backend credential existingSecrets as data ({name, backend, prop, secret, key}), so
+deployment.yaml renders the mounts/volumes with one range. <backend> matches the
+backend-<name>.properties filename; <prop> is the jclouds key the initContainer writes.
+*/}}
+{{- define "s3proxy.externalBackendSecrets" -}}
+{{- $b := .Values.config.backends -}}
+{{- $out := list -}}
+  {{- if and $b.s3.enabled $b.s3.secretAccessKey.existingSecret -}}
+    {{- $out = append $out (dict "name" "s3-credential" "backend" "s3" "prop" "jclouds.credential" "secret" $b.s3.secretAccessKey.existingSecret "key" $b.s3.secretAccessKey.secretKey) -}}
+  {{- end -}}
+  {{- if and $b.azureblob.enabled $b.azureblob.key.existingSecret -}}
+    {{- $out = append $out (dict "name" "azureblob-credential" "backend" "azureblob" "prop" "jclouds.credential" "secret" $b.azureblob.key.existingSecret "key" $b.azureblob.key.secretKey) -}}
+  {{- end -}}
+  {{- if and $b.azureblob.enabled $b.azureblob.sasToken.existingSecret -}}
+    {{- $out = append $out (dict "name" "azureblob-sas" "backend" "azureblob" "prop" "jclouds.azureblob.sas" "secret" $b.azureblob.sasToken.existingSecret "key" $b.azureblob.sasToken.secretKey) -}}
+  {{- end -}}
+  {{- if and $b.b2.enabled $b.b2.applicationKey.existingSecret -}}
+    {{- $out = append $out (dict "name" "b2-credential" "backend" "b2" "prop" "jclouds.credential" "secret" $b.b2.applicationKey.existingSecret "key" $b.b2.applicationKey.secretKey) -}}
+  {{- end -}}
+  {{- if and $b.openstackSwift.enabled $b.openstackSwift.password.existingSecret -}}
+    {{- $out = append $out (dict "name" "openstack-swift-credential" "backend" "openstack-swift" "prop" "jclouds.credential" "secret" $b.openstackSwift.password.existingSecret "key" $b.openstackSwift.password.secretKey) -}}
+  {{- end -}}
+  {{- if and $b.rackspaceCloudfiles.enabled $b.rackspaceCloudfiles.apiKey.existingSecret -}}
+    {{- $out = append $out (dict "name" "rackspace-cloudfiles-credential" "backend" "rackspace-cloudfiles" "prop" "jclouds.credential" "secret" $b.rackspaceCloudfiles.apiKey.existingSecret "key" $b.rackspaceCloudfiles.apiKey.secretKey) -}}
+  {{- end -}}
+{{- $out | toJson -}}
+{{- end }}
