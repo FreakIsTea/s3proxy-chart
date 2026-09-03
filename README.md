@@ -1,6 +1,6 @@
 # s3proxy
 
-![Version: 0.4.2](https://img.shields.io/badge/Version-0.4.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.3.0](https://img.shields.io/badge/AppVersion-3.3.0-informational?style=flat-square)
+![Version: 0.4.3](https://img.shields.io/badge/Version-0.4.3-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.3.0](https://img.shields.io/badge/AppVersion-3.3.0-informational?style=flat-square)
 
 A Helm chart for deploying S3Proxy - Access other storage backends via the S3 API
 
@@ -23,7 +23,7 @@ The chart tracks S3Proxy (`andrewgaul/s3proxy`) through `appVersion` (currently 
 S3Proxy `3.0.0` deprecated the Apache jclouds storage backends (`s3`, `aws-s3`, `azureblob`, `filesystem`, `transient`) in favor of SDK / NIO2 providers. Upstream has announced that `3.3.0` is the last release to bundle jclouds and that future releases "will lack its Atmos and B2 storage backends" (no jclouds-free release has shipped yet; `3.3.0` remains the latest). The jclouds providers still work on 3.x, but are deprecated:
 
 - `filesystem` / `transient`: already default to the non-deprecated `*-nio2` variants (`nio2: true`).
-- `azureblob`: **defaults to `provider: azureblob-sdk`** (the Azure SDK provider, which signs correctly against custom endpoints such as Azurite). The legacy jclouds `azureblob` provider is deprecated and mis-signs against custom endpoints; set `provider: azureblob` only if you specifically need it. On real Azure, `azureblob-sdk` may require `config.backends.azureblob.regions` for bucket creation.
+- `azureblob`: **defaults to `provider: azureblob-sdk`** (the Azure SDK provider, which signs correctly against custom endpoints such as Azurite). The legacy jclouds `azureblob` provider is deprecated and mis-signs against custom endpoints; set `provider: azureblob` only if you specifically need it. On real Azure, `azureblob-sdk` may require `config.backends.azureblob.regions` for bucket creation. For AKS Managed/Workload Identity (no static key), set `config.backends.azureblob.managedIdentity: true` — see "Example 3b" below.
 - `s3`, `googleCloudStorage`, `openstackSwift`: SDK providers exist upstream (`aws-s3-sdk`, `google-cloud-storage-sdk`, `openstack-swift-sdk`). `rackspaceCloudfiles` is OpenStack-Swift-compatible and may be served by `openstack-swift-sdk`. Migrating the chart defaults to the SDK providers is tracked separately.
 - `b2` (and Atmos, if ever added) are jclouds-only with **no SDK successor**. These are the backends upstream has said future releases will drop.
 
@@ -156,6 +156,12 @@ The following section lists the configurable parameters of the s3proxy chart and
 			<td>Storage account key value</td>
 			<td><code>string</code></td>
 			<td><code>""</code></td>
+		</tr>
+		<tr>
+			<td><code>config.backends.azureblob.managedIdentity</code></td>
+			<td>Use Azure Managed/Workload Identity instead of a static account key or SAS token. Requires <code>provider: azureblob-sdk</code>; mutually exclusive with <code>key.<i></code> and <code>sasToken.</i></code>. When true the chart renders both <code>jclouds.identity</code> and <code>jclouds.credential</code> empty, which makes azureblob-sdk fall back to Azure's <code>DefaultAzureCredential</code> (consuming the AKS workload-identity env <code>AZURE_CLIENT_ID</code>/<code>AZURE_TENANT_ID</code>/<code>AZURE_FEDERATED_TOKEN_FILE</code>). Set <code>account</code> (or <code>endpoint</code>) for the storage endpoint, annotate the ServiceAccount with <code>azure.workload.identity/client-id</code> (<code>serviceAccount.annotations</code>) and label the pod <code>azure.workload.identity/use: "true"</code> (<code>podLabels</code>).</td>
+			<td><code>bool</code></td>
+			<td><code>false</code></td>
 		</tr>
 		<tr>
 			<td><code>config.backends.azureblob.provider</code></td>
@@ -943,6 +949,40 @@ persistence:
 Install:
 ```bash
 helm install s3proxy-azure ./s3proxy -f values-azure.yaml
+```
+
+### Example 3b: Azure Blob with Managed / Workload Identity (no static key)
+
+On AKS with Workload Identity, set `managedIdentity: true` instead of an account
+key or SAS token. The chart then renders both `jclouds.identity` and
+`jclouds.credential` empty, which makes the `azureblob-sdk` provider fall back to
+Azure's `DefaultAzureCredential` — it reads the federated token AKS injects
+(`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_FEDERATED_TOKEN_FILE`). The storage
+account name goes in the endpoint, never in the identity.
+
+```yaml
+# values-azure-mi.yaml
+config:
+  backends:
+    filesystem:
+      enabled: false
+    azureblob:
+      enabled: true
+      provider: "azureblob-sdk"   # required: the legacy jclouds provider can't do token auth
+      managedIdentity: true
+      account: "mystorageaccount" # used for the endpoint; NOT emitted as jclouds.identity
+      # endpoint: "https://mystorageaccount.blob.core.windows.net"  # or set explicitly
+
+# Bind the pod to the AKS user-assigned identity:
+serviceAccount:
+  create: true
+  annotations:
+    azure.workload.identity/client-id: "<managed-identity-client-id>"
+podLabels:
+  azure.workload.identity/use: "true"
+
+persistence:
+  enabled: false
 ```
 
 ### Example 4: Google Cloud Storage Backend
