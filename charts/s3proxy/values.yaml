@@ -234,6 +234,8 @@ config:
       enabled: false
       # -- Provider type. Defaults to `azureblob-sdk` (Azure SDK): it signs correctly against custom endpoints (Azurite, Azure Gov/China, private endpoints) and is the non-deprecated provider on S3Proxy 3.x. The legacy jclouds `azureblob` provider is deprecated upstream and mis-signs against custom endpoints; on real Azure `azureblob-sdk` may require `regions` to be set for bucket creation.
       provider: "azureblob-sdk"
+      # -- Use Azure Managed/Workload Identity instead of a static account key or SAS token. Requires `provider: azureblob-sdk`; mutually exclusive with `key.*` and `sasToken.*`. When true the chart renders both `jclouds.identity` and `jclouds.credential` empty, which makes azureblob-sdk fall back to Azure's `DefaultAzureCredential` (consuming the AKS workload-identity env `AZURE_CLIENT_ID`/`AZURE_TENANT_ID`/`AZURE_FEDERATED_TOKEN_FILE`). Set `account` (or `endpoint`) for the storage endpoint, annotate the ServiceAccount with `azure.workload.identity/client-id` (`serviceAccount.annotations`) and label the pod `azure.workload.identity/use: "true"` (`podLabels`).
+      managedIdentity: false
       # -- Storage account name
       account: ""
       # -- Storage account key configuration
