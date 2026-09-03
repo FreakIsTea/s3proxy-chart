@@ -87,6 +87,19 @@ s3proxy.large-object-mocking=true
     {{- end }}
   {{- end }}
 {{- end }}
+{{- /* Fail fast on an Azure managed-identity config that can't authenticate, since
+       the failure otherwise surfaces only at runtime as an opaque Azure SDK error. */}}
+{{- if and .Values.config.backends.azureblob.enabled .Values.config.backends.azureblob.managedIdentity }}
+  {{- if ne .Values.config.backends.azureblob.provider "azureblob-sdk" }}
+    {{- fail "config.backends.azureblob.managedIdentity requires provider=azureblob-sdk; the legacy jclouds azureblob provider cannot use Azure token auth." }}
+  {{- end }}
+  {{- if or .Values.config.backends.azureblob.key.value .Values.config.backends.azureblob.key.existingSecret .Values.config.backends.azureblob.sasToken.value }}
+    {{- fail "config.backends.azureblob.managedIdentity conflicts with a static credential; a non-empty key.*/sasToken.* disables DefaultAzureCredential. Unset them." }}
+  {{- end }}
+  {{- if and (not .Values.config.backends.azureblob.account) (not .Values.config.backends.azureblob.endpoint) }}
+    {{- fail "config.backends.azureblob.managedIdentity needs the storage endpoint; set config.backends.azureblob.account (default endpoint) or endpoint." }}
+  {{- end }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -174,15 +187,23 @@ data:
     # (otherwise "no jclouds.regions configured" -> InvalidLocationConstraint).
     jclouds.regions={{ .Values.config.backends.azureblob.regions }}
   {{- end }}
-  {{- if .Values.config.backends.azureblob.account }}
-    jclouds.identity={{ .Values.config.backends.azureblob.account }}
-  {{- end }}
-  {{- /* With a key (key.value or key.existingSecret) the initContainer merges
-         jclouds.credential in from a Secret. S3Proxy requires the property in every
-         backend file, so emit it empty when neither is set (SAS-token or Azure
-         Workload Identity auth). */}}
-  {{- if and (not .Values.config.backends.azureblob.key.value) (not .Values.config.backends.azureblob.key.existingSecret) }}
+  {{- if .Values.config.backends.azureblob.managedIdentity }}
+    # Managed/Workload Identity: azureblob-sdk falls back to Azure's
+    # DefaultAzureCredential (reads the AKS-injected AZURE_CLIENT_ID/TENANT_ID/
+    # FEDERATED_TOKEN_FILE) only when BOTH identity and credential are empty. The
+    # account name lives in jclouds.endpoint above, never in the identity.
+    jclouds.identity=
     jclouds.credential=
+  {{- else }}
+    {{- if .Values.config.backends.azureblob.account }}
+    jclouds.identity={{ .Values.config.backends.azureblob.account }}
+    {{- end }}
+    {{- /* With a key (key.value or key.existingSecret) the initContainer merges
+           jclouds.credential in from a Secret. S3Proxy requires the property in every
+           backend file, so emit it empty when neither is set (SAS-token auth). */}}
+    {{- if and (not .Values.config.backends.azureblob.key.value) (not .Values.config.backends.azureblob.key.existingSecret) }}
+    jclouds.credential=
+    {{- end }}
   {{- end }}
   {{- range $index, $bucket := .Values.config.backends.azureblob.bucketLocators }}
     s3proxy.bucket-locator.{{ add $index 1 }}={{ $bucket }}

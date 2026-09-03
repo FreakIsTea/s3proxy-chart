@@ -30,6 +30,7 @@ jobs:
           - test-values/s3.yaml
           - test-values/azureblob.yaml
           - test-values/azureblob-existing-secret.yaml
+          - test-values/azureblob-managed-identity.yaml
           - test-values/gcs.yaml
           - test-values/b2.yaml
           - test-values/openstack-swift.yaml
