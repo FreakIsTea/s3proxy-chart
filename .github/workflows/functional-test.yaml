@@ -58,6 +58,9 @@ jobs:
             values: ci/functional/values/filesystem.yaml
           - backend: transient
             values: ci/functional/values/transient.yaml
+          - backend: auth-existing-secret
+            values: ci/functional/values/auth-existing-secret.yaml
+            authSecret: true
           - backend: azureblob
             values: ci/functional/values/azureblob.yaml
             mock: ci/functional/mocks/azurite.yaml
@@ -110,6 +113,14 @@ jobs:
           kubectl -n "${NAMESPACE}" create secret generic s3proxy-tls \
             --from-file=keystore.p12=/tmp/keystore.p12 \
             --from-literal=keystore-password=changeit
+
+      - name: Create client auth Secret (auth existingSecret leg)
+        if: matrix.authSecret
+        # The identity/secret the smoke test signs with, in the Secret the chart
+        # references via config.auth.existingSecret. Broken wiring leaves
+        # s3proxy.identity/credential unset and the round-trip fails to authenticate.
+        run: |
+          kubectl -n "${NAMESPACE}" create secret generic s3proxy-auth             --from-literal=accessKeyId='test-access-key'             --from-literal=secretAccessKey='test-secret-key'
 
       - name: Create Azure Blob key Secret (existingSecret leg)
         if: matrix.azureKeySecret

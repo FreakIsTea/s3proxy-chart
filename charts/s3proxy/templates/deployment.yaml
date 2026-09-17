@@ -72,6 +72,18 @@ spec:
                     cat "$COMMON_SECRET" >> "$output_file"
                   fi
 
+                  # Client auth from an existingSecret: each file under /auth-secret/
+                  # is named for the S3Proxy property it holds.
+                  if [ -d "/auth-secret" ]
+                  then
+                    for prop_file in /auth-secret/*
+                    do
+                      [ -f "$prop_file" ] || continue
+                      echo "" >> "$output_file"  # Add newline separator
+                      printf '%s=%s\n' "$(basename "$prop_file")" "$(cat "$prop_file")" >> "$output_file"
+                    done
+                  fi
+
                   # Append this backend's own secret: backend-<name>.properties
                   # pairs with secret-<name>.properties
                   backend="${filename#backend-}"
@@ -120,6 +132,12 @@ spec:
 {{- if and .Values.config.tls.enabled .Values.config.tls.keystorePassword.existingSecret }}
             - name: tls-keystore-password
               mountPath: /tls-password
+              readOnly: true
+{{- end }}
+{{- range $s := (include "s3proxy.authSecrets" . | fromJsonArray) }}
+            - name: {{ $s.name }}
+              mountPath: /auth-secret/{{ $s.prop }}
+              subPath: {{ $s.prop }}
               readOnly: true
 {{- end }}
 {{- range $s := (include "s3proxy.externalBackendSecrets" . | fromJsonArray) }}
@@ -290,6 +308,14 @@ spec:
             items:
               - key: {{ .Values.config.backends.googleCloudStorage.privateKey.secretKey }}
                 path: gcs-private.key
+{{- end }}
+{{- range $s := (include "s3proxy.authSecrets" . | fromJsonArray) }}
+        - name: {{ $s.name }}
+          secret:
+            secretName: {{ $s.secret }}
+            items:
+              - key: {{ $s.key }}
+                path: {{ $s.prop }}
 {{- end }}
 {{- range $s := (include "s3proxy.externalBackendSecrets" . | fromJsonArray) }}
         - name: {{ $s.name }}

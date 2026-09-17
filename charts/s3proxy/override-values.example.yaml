@@ -26,6 +26,12 @@ config:
     # These should be changed to secure values
     identity: "admin"
     secret: "changeme123"
+    # Or keep them out of this file entirely and read them from a Secret you
+    # manage. Each half is read from the Secret only when the inline value above
+    # is empty, so the two can be mixed.
+    # existingSecret: "my-s3proxy-auth"
+    # identityKey: "accessKeyId"
+    # secretKey: "secretAccessKey"
 
   # Native in-pod HTTPS (S3Proxy secure-endpoint). When enabled, S3Proxy serves
   # HTTPS only on service.targetPort; TLS is terminated in the pod rather than at

@@ -122,10 +122,16 @@ config:
   auth:
     # -- Authorization type (none, aws-v2, aws-v4, aws-v2-or-v4)
     type: "aws-v4"
-    # -- S3 Access Key ID for client authentication
+    # -- S3 Access Key ID for client authentication. Rendered into the chart-owned Secret in plaintext; prefer `existingSecret` when the values file lives in Git. Takes precedence over `existingSecret`/`identityKey`.
     identity: ""
-    # -- S3 Secret Access Key for client authentication
+    # -- S3 Secret Access Key for client authentication. Rendered into the chart-owned Secret in plaintext; prefer `existingSecret` when the values file lives in Git. Takes precedence over `existingSecret`/`secretKey`.
     secret: ""
+    # -- Name of an existing Secret holding the client authentication credentials. Each of `identity`/`secret` is read from this Secret only when its inline value above is empty, so the two can be mixed.
+    existingSecret: ""
+    # -- Key in `existingSecret` holding the S3 Access Key ID. Ignored when `identity` is set; set to `""` to never read an identity from the Secret.
+    identityKey: "identity"
+    # -- Key in `existingSecret` holding the S3 Secret Access Key. Ignored when `secret` is set; set to `""` to never read a credential from the Secret.
+    secretKey: "secret"
 
   tls:
     # -- Enable native in-pod HTTPS (S3Proxy `secure-endpoint`). When enabled, S3Proxy serves HTTPS only on `service.targetPort` (the plaintext endpoint is not bound), so TLS is terminated in the pod rather than at the ingress. Requires a PKCS12 (or JKS) keystore and its password. `tcpSocket` health probes are unaffected (they do not perform a TLS handshake).

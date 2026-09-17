@@ -29,6 +29,26 @@ secure-endpoint), otherwise "http". Shared by service.yaml and deployment.yaml
 {{- end }}
 
 {{- /*
+Client-auth existingSecret fields as data ({name, prop, secret, key}), so deployment.yaml
+renders the mounts/volumes with one range. <prop> is the S3Proxy key the initContainer
+writes into every backend file. An inline config.auth.identity/secret wins, so a field is
+sourced externally only when its inline value is empty; an empty key name opts out.
+*/}}
+{{- define "s3proxy.authSecrets" -}}
+{{- $a := .Values.config.auth -}}
+{{- $out := list -}}
+  {{- if $a.existingSecret -}}
+    {{- if and $a.identityKey (not $a.identity) -}}
+      {{- $out = append $out (dict "name" "auth-identity" "prop" "s3proxy.identity" "secret" $a.existingSecret "key" $a.identityKey) -}}
+    {{- end -}}
+    {{- if and $a.secretKey (not $a.secret) -}}
+      {{- $out = append $out (dict "name" "auth-credential" "prop" "s3proxy.credential" "secret" $a.existingSecret "key" $a.secretKey) -}}
+    {{- end -}}
+  {{- end -}}
+{{- $out | toJson -}}
+{{- end }}
+
+{{- /*
 Backend credential existingSecrets as data ({name, backend, prop, secret, key}), so
 deployment.yaml renders the mounts/volumes with one range. <backend> matches the
 backend-<name>.properties filename; <prop> is the jclouds key the initContainer writes.
