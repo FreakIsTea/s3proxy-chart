@@ -1,6 +1,6 @@
 # s3proxy
 
-![Version: 0.4.3](https://img.shields.io/badge/Version-0.4.3-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.3.0](https://img.shields.io/badge/AppVersion-3.3.0-informational?style=flat-square)
+![Version: 0.5.0](https://img.shields.io/badge/Version-0.5.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.3.0](https://img.shields.io/badge/AppVersion-3.3.0-informational?style=flat-square)
 
 A Helm chart for deploying S3Proxy - Access other storage backends via the S3 API
 
@@ -92,16 +92,34 @@ The following section lists the configurable parameters of the s3proxy chart and
 			<td><code>80</code></td>
 		</tr>
 		<tr>
-			<td><code>config.auth.identity</code></td>
-			<td>S3 Access Key ID for client authentication</td>
+			<td><code>config.auth.existingSecret</code></td>
+			<td>Name of an existing Secret holding both client authentication credentials (see <code>identityKey</code>/<code>secretKey</code>). Takes precedence over <code>identity</code>/<code>secret</code>, which are otherwise stored in plaintext in the chart-owned Secret; prefer this when the values file lives in Git.</td>
 			<td><code>string</code></td>
 			<td><code>""</code></td>
 		</tr>
 		<tr>
-			<td><code>config.auth.secret</code></td>
-			<td>S3 Secret Access Key for client authentication</td>
+			<td><code>config.auth.identity</code></td>
+			<td>S3 Access Key ID for client authentication, stored in the chart-owned Secret. Ignored when <code>existingSecret</code> is set.</td>
 			<td><code>string</code></td>
 			<td><code>""</code></td>
+		</tr>
+		<tr>
+			<td><code>config.auth.identityKey</code></td>
+			<td>Key within <code>existingSecret</code> that holds the S3 Access Key ID</td>
+			<td><code>string</code></td>
+			<td><code>"accessKeyId"</code></td>
+		</tr>
+		<tr>
+			<td><code>config.auth.secret</code></td>
+			<td>S3 Secret Access Key for client authentication, stored in the chart-owned Secret. Ignored when <code>existingSecret</code> is set.</td>
+			<td><code>string</code></td>
+			<td><code>""</code></td>
+		</tr>
+		<tr>
+			<td><code>config.auth.secretKey</code></td>
+			<td>Key within <code>existingSecret</code> that holds the S3 Secret Access Key</td>
+			<td><code>string</code></td>
+			<td><code>"secretAccessKey"</code></td>
 		</tr>
 		<tr>
 			<td><code>config.auth.type</code></td>
@@ -1024,6 +1042,41 @@ persistence:
   enabled: false
 ```
 
+## Client authentication credentials
+
+`config.auth.identity` / `config.auth.secret` are the S3 Access Key ID and Secret
+Access Key that *clients* present to S3Proxy.
+
+### Option A: existing Secret (recommended)
+
+Point `config.auth.existingSecret` at a Secret you manage yourself, so the credentials
+never appear in the values file (e.g. in GitOps). It takes precedence over inline
+`identity`/`secret`; both credentials are read from it:
+
+```yaml
+config:
+  auth:
+    type: "aws-v4"
+    existingSecret: my-s3proxy-auth
+    identityKey: accessKeyId        # default; key holding the Access Key ID
+    secretKey: secretAccessKey      # default; key holding the Secret Access Key
+```
+
+```bash
+kubectl create secret generic my-s3proxy-auth \
+  --from-literal=accessKeyId='myaccesskey' \
+  --from-literal=secretAccessKey='mysecretkey'
+```
+
+Rotating the Secret does not restart the pod — roll the Deployment yourself, since the
+credentials are read once at startup.
+
+### Option B: inline credentials
+
+Set `config.auth.identity` / `config.auth.secret` directly, as in
+[Example 1](#example-1-filesystem-backend-with-authentication). Convenient for
+testing; both values are stored in plaintext in the chart's own Secret.
+
 ## Testing the Installation
 
 Once deployed, you can test S3Proxy using the AWS CLI:
@@ -1214,7 +1267,7 @@ This will remove all resources created by the chart. If using persistence, the P
 
 ### Common Issues
 
-1. **Authentication failures**: Ensure `config.auth.identity` and `config.auth.secret` are set correctly for client authentication.
+1. **Authentication failures**: Ensure `config.auth.identity` and `config.auth.secret` are set correctly (or, with `config.auth.existingSecret`, that the Secret exists and its `identityKey`/`secretKey` entries are present) for client authentication.
 
 2. **Backend connection issues**: Verify backend credentials are correctly configured in the appropriate section (e.g., `config.backend.awsS3.*`).
 
