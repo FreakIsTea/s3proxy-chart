@@ -236,6 +236,41 @@ persistence:
   enabled: false
 ```
 
+## Client authentication credentials
+
+`config.auth.identity` / `config.auth.secret` are the S3 Access Key ID and Secret
+Access Key that *clients* present to S3Proxy.
+
+### Option A: existing Secret (recommended)
+
+Point `config.auth.existingSecret` at a Secret you manage yourself, so the credentials
+never appear in the values file (e.g. in GitOps). It takes precedence over inline
+`identity`/`secret`; both credentials are read from it:
+
+```yaml
+config:
+  auth:
+    type: "aws-v4"
+    existingSecret: my-s3proxy-auth
+    identityKey: accessKeyId        # default; key holding the Access Key ID
+    secretKey: secretAccessKey      # default; key holding the Secret Access Key
+```
+
+```bash
+kubectl create secret generic my-s3proxy-auth \
+  --from-literal=accessKeyId='myaccesskey' \
+  --from-literal=secretAccessKey='mysecretkey'
+```
+
+Rotating the Secret does not restart the pod — roll the Deployment yourself, since the
+credentials are read once at startup.
+
+### Option B: inline credentials
+
+Set `config.auth.identity` / `config.auth.secret` directly, as in
+[Example 1](#example-1-filesystem-backend-with-authentication). Convenient for
+testing; both values are stored in plaintext in the chart's own Secret.
+
 ## Testing the Installation
 
 Once deployed, you can test S3Proxy using the AWS CLI:
@@ -426,7 +461,7 @@ This will remove all resources created by the chart. If using persistence, the P
 
 ### Common Issues
 
-1. **Authentication failures**: Ensure `config.auth.identity` and `config.auth.secret` are set correctly for client authentication.
+1. **Authentication failures**: Ensure `config.auth.identity` and `config.auth.secret` are set correctly (or, with `config.auth.existingSecret`, that the Secret exists and its `identityKey`/`secretKey` entries are present) for client authentication.
 
 2. **Backend connection issues**: Verify backend credentials are correctly configured in the appropriate section (e.g., `config.backend.awsS3.*`).
 
