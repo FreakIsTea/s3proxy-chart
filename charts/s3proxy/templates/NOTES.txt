@@ -106,8 +106,8 @@
 {{- if .Values.config.backends.filesystem.enabled }}
    - Using filesystem backend at: {{ .Values.config.backends.filesystem.basedir }}
 {{- end }}
-{{- if not .Values.config.auth.identity }}
-   - WARNING: S3Proxy identity not configured. Remember to set config.auth.identity and config.auth.secret for authentication.
+{{- if and (not .Values.config.auth.identity) (not .Values.config.auth.existingSecret) }}
+   - WARNING: S3Proxy identity not configured. Remember to set config.auth.identity and config.auth.secret (or config.auth.existingSecret) for authentication.
 {{- end }}
 {{- if .Values.config.backends.s3.enabled }}
    - Make sure to configure S3 backend credentials
